@@ -72,19 +72,22 @@ jobs:
       fail-fast: false
       matrix:
         job:
-          - { os: ubuntu-20.04, target: arm-unknown-linux-gnueabihf , use-cross: true }
-          - { os: ubuntu-20.04, target: arm-unknown-linux-musleabihf, use-cross: true }
-          - { os: ubuntu-20.04, target: aarch64-unknown-linux-gnu   , use-cross: true }
-          - { os: ubuntu-20.04, target: i686-unknown-linux-gnu      , use-cross: true }
-          - { os: ubuntu-20.04, target: i686-unknown-linux-musl     , use-cross: true }
-          - { os: ubuntu-20.04, target: x86_64-unknown-linux-gnu    , use-cross: true }
-          - { os: ubuntu-20.04, target: x86_64-unknown-linux-musl   , use-cross: true }
-          - { os: macos-latest , target: aarch64-apple-darwin         }
-          - { os: macos-latest , target: x86_64-apple-darwin         }
-          # - { os: windows-2019, target: i686-pc-windows-gnu         }  ## disabled; error: linker `i686-w64-mingw32-gcc` not found
-          - { os: windows-2019, target: i686-pc-windows-msvc        }
-          - { os: windows-2019, target: x86_64-pc-windows-gnu       }
-          - { os: windows-2019, target: x86_64-pc-windows-msvc      }
+          - { os: ubuntu-20.04, target: arm-unknown-linux-gnueabihf , toolchain: stable, use-cross: true }
+          - { os: ubuntu-20.04, target: arm-unknown-linux-musleabihf, toolchain: stable, use-cross: true }
+          - { os: ubuntu-20.04, target: aarch64-unknown-linux-gnu   , toolchain: stable, use-cross: true }
+          - { os: ubuntu-20.04, target: i686-unknown-linux-gnu      , toolchain: stable, use-cross: true }
+          - { os: ubuntu-20.04, target: i686-unknown-linux-musl     , toolchain: stable, use-cross: true }
+          - { os: ubuntu-20.04, target: x86_64-unknown-linux-gnu    , toolchain: stable, use-cross: true }
+          - { os: ubuntu-20.04, target: x86_64-unknown-linux-musl   , toolchain: stable, use-cross: true }
+          - { os: macos-latest , target: aarch64-apple-darwin        , toolchain: nightly, use-cross: true }
+          - { os: macos-latest , target: x86_64-apple-darwin        , toolchain: stable }
+          # - { os: windows-2019, target: i686-pc-windows-gnu        , toolchain: stable  }  ## disabled; error: linker `i686-w64-mingw32-gcc` not found
+          - { os: windows-2019, target: i686-pc-windows-msvc        , toolchain: stable }
+          - { os: windows-2019, target: x86_64-pc-windows-gnu       , toolchain: stable }
+          - { os: windows-2019, target: x86_64-pc-windows-msvc      , toolchain: stable }
+        # include:
+        #   - job:
+        #     - { os: macos-latest, target: aarch64-apple-darwin, toolchain: nightly }
 
     steps:
     - name: Checkout source code
@@ -109,10 +112,16 @@ jobs:
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: stable
+        toolchain: ${{ matrix.job.toolchain }}
         target: ${{ matrix.job.target }}
         override: true
         profile: minimal # minimal component installation (ie, no documentation)
+
+    - name: Set macOS environment variables
+      if: runner.os == 'macOS'
+      run: |
+        echo "SDKROOT=$(xcrun -sdk macosx11.1 --show-sdk-path)" >> $GITHUB_ENV
+        echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx11.1 --show-sdk-platform-version)" >> $GITHUB_ENV
 
     - name: Show version information (Rust, cargo, GCC)
       shell: bash
@@ -170,7 +179,6 @@ jobs:
     - name: Set testing options
       id: test-options
       shell: bash
-      if: ${{ matrix.job.target != 'aarch64-apple-darwin' }}
       run: |
         # test only library unit tests and binary for arm-type targets
         unset CARGO_TEST_OPTIONS
@@ -179,7 +187,6 @@ jobs:
 
     - name: Run tests
       uses: actions-rs/cargo@v1
-      if: ${{ matrix.job.target != 'aarch64-apple-darwin' }}
       with:
         use-cross: ${{ matrix.job.use-cross }}
         command: test
